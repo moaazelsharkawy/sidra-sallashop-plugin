@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Plugin Name: Sidracoin Payment for WooCommerce
  * Plugin URI: https://sidra.salla-shop.com/
@@ -10,45 +11,44 @@
  * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  */
 
-// Exit if accessed directly
 if (!defined('ABSPATH')) {
-    exit;
+    exit; // Exit if accessed directly
 }
 
-// Add the payment gateway to WooCommerce
 add_filter('woocommerce_payment_gateways', 'add_to_woo_sidrasalla_payment_gateway');
+
 function add_to_woo_sidrasalla_payment_gateway($gateways)
 {
     $gateways[] = 'WC_Sidrasalla_Payment_Gateway';
     return $gateways;
 }
 
-// Initialize the payment gateway class
-add_action('plugins_loaded', 'sidrasalla_payment_init', 11);
-function sidrasalla_payment_init()
-{
-    if (!class_exists('WC_Sidrasalla_Payment_Gateway')) {
+if (!class_exists('WC_Sidrasalla_Payment_Gateway')) {
 
+    add_action('plugins_loaded', 'sidrasalla_payment_init', 11);
+
+    function sidrasalla_payment_init()
+    {
         class WC_Sidrasalla_Payment_Gateway extends WC_Payment_Gateway
         {
 
             public function __construct()
             {
                 $this->id                 = 'sidrasalla_payment';
-                $this->icon               = apply_filters('woocommerce_sidrasalla_icon', 'https://sidra.salla-shop.com/wp-content/uploads/2024/04/paylog3.png');
+                $this->icon = apply_filters( 'woocommerce_sidrasalla_icon', 'https://sidra.salla-shop.com/wp-content/uploads/2024/04/paylog3.png' );
                 $this->has_fields         = false;
                 $this->method_title       = __('Sidrasalla Payment', 'sidrasalla-pay-woo');
                 $this->method_description = __('Salla Sidra payment systems.', 'sidrasalla-pay-woo');
 
-                // Load settings
+                $this->title        = $this->get_option('title');
+                $this->description  = $this->get_option('description');
+                $this->instructions = __('يرجى إرسال %s Sidra Coin عن طريق استخدام العنوان:', 'sidrasalla-pay-woo') . '<br><strong>%s</strong>.<br>' . __('بمجرد الانتهاء من ذلك، يرجى إدخال هاش المعاملة بالأسفل.', 'sidrasalla-pay-woo');                 
                 $this->init_form_fields();
                 $this->init_settings();
 
-                // Save settings
                 add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
             }
 
-            // Initialize form fields for settings
             public function init_form_fields()
             {
                 $this->form_fields = array(
@@ -79,32 +79,32 @@ function sidrasalla_payment_init()
                 );
             }
 
-            // Display payment fields on checkout
             public function payment_fields()
-            {
-                if ($this->description) {
-                    echo wpautop(wptexturize($this->description));
-                }
+{
+    if ($this->description) {
+        echo wpautop(wptexturize($this->description));
+    }
 
-                echo '<p>' . sprintf($this->instructions, $this->get_order_total(), $this->get_option('address')) . '</p>';
-                ?>
-                <p><?php _e("ادخل هاش المعاملة:", 'sidrasalla-pay-woo'); ?></p>
-                <p class="form-row form-row-wide">
-                    <input type="text" name="txid" placeholder="<?php _e('Transaction ID', 'sidrasalla-pay-woo'); ?>" />
-                </p>
-                <?php
-            }
+    echo '<p>' . sprintf($this->instructions, $this->get_order_total(), $this->get_option('address')) . '</p>';
+    ?>
+    <p><?php _e("ادخل هاش المعاملة:", 'sidrasalla-pay-woo'); ?></p>
+    <p class="form-row form-row-wide">
+        <input type="text" name="txid" placeholder="<?php _e('Transaction ID', 'sidrasalla-pay-woo'); ?>" />
+    </p>
+    <?php
+}
 
-            // Validate payment fields
+
             public function validate_fields()
             {
-                // Check if transaction ID is provided
+
+                // if transaction ID is not provided
                 if (empty($_POST['txid'])) {
                     wc_add_notice(__('Transaction Hash مطلوب!', 'error'), 'error');
                     return false;
                 }
 
-                // Check if transaction ID is already used in an existing order
+                // if transaction ID is already used in an existing order
                 if (get_posts(array('post_type' => 'shop_order', 'meta_key' => 'txid', 'meta_value' => $_POST['txid'], 'post_status' => 'any'))) {
                     wc_add_notice(__('Transaction ID is not correct.', 'error'), 'error');
                     return false;
@@ -112,65 +112,68 @@ function sidrasalla_payment_init()
                 return true;
             }
 
-            // Process payment
-            public function process_payment($order_id)
-            {
-                // Connect to Sidra Chain API using cURL
-                $curl = curl_init();
+           public function process_payment($order_id)
+{
+    // Get the transaction ID from the POST data
+    $txid = sanitize_text_field($_POST['txid']);
 
-                // Configure cURL options
-                $api_url = 'https://ledger.sidrachain.com/api/v2/transactions';
-                $hash = urlencode($_POST['txid']);
-                $request_url = "{$api_url}?hash={$hash}";
+    // Let's connect to Sidra Chain API using cURL
+    $curl = curl_init();
 
-                curl_setopt($curl, CURLOPT_URL, $request_url);
-                curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($curl, CURLOPT_TIMEOUT, 30); // Set timeout to 30 seconds
+    // Configure cURL options
+    $api_url = 'https://ledger.sidrachain.com/api/v2/transactions';
+    $request_url = "{$api_url}?hash={$txid}";
 
-                // Execute the cURL request
-                $response = curl_exec($curl);
+    curl_setopt($curl, CURLOPT_URL, $request_url);
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($curl, CURLOPT_TIMEOUT, 30); // Set timeout to 30 seconds
 
-                // Check for cURL errors
-                if (curl_errno($curl)) {
-                    wc_add_notice(__('لم يتم الاتصال ببلوكتيشن سيدرا بعد.', 'error'), 'error');
-                    return false;
-                }
+    // Execute the cURL request
+    $response = curl_exec($curl);
 
-                // Decode response body
-                $response_data = json_decode($response);
+    // Check for cURL errors
+    if (curl_errno($curl)) {
+        wc_add_notice(__('Failed to connect to Sidra Chain.', 'error'), 'error');
+        return false;
+    }
 
-                // Check response status code
-                $response_code = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-                if (200 !== $response_code || is_null($response_data)) {
-                    wc_add_notice(__('لم يتم الاتصال ببلوكتيشن سيدرا بعد.', 'error'), 'error');
-                    return false;
-                }
+    // Decode response body
+    $response_data = json_decode($response);
 
-                // Check if hash ID is valid
-                if (isset($response_data->data[0])) {
-                    // Perform order completion tasks
-                    $order = wc_get_order($order_id);
-                    $order->payment_complete();
-                    $order->reduce_order_stock();
-                    $order->add_meta_data('txid', $_POST['txid'], true);
-                    $order->save();
+    // Check response status code
+    $response_code = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+    if ($response_code !== 200 || empty($response_data->items)) {
+        wc_add_notice(__('Invalid transaction hash.', 'error'), 'error');
+        return false;
+    }
 
-                    // Empty cart
-                    WC()->cart->empty_cart();
+    // Transaction hash is valid, process the payment
+    // You can add your payment processing logic here
 
-                    // Redirect to thank you page
-                    return array(
-                        'result'   => 'success',
-                        'redirect' => $this->get_return_url($order)
-                    );
-                } else {
-                    // Handle invalid hash ID
-                    wc_add_notice(__('هاش المعاملة غير صالح!', 'error'), 'error');
-                    return false;
-                }
+    // Close cURL session
+    curl_close($curl);
 
-                // Close cURL session
-                curl_close($curl);
+    // Get the order
+    $order = wc_get_order($order_id);
+
+    // Mark the order as complete
+    $order->payment_complete();
+    $order->reduce_order_stock();
+    $order->add_meta_data('txid', $txid, true);
+    $order->save();
+
+    // Empty cart
+    WC()->cart->empty_cart();
+
+    // Redirect to the thank you page
+    return array(
+        'result'   => 'success',
+        'redirect' => $this->get_return_url($order)
+    );
+
+
+
+
             }
         }
     }
