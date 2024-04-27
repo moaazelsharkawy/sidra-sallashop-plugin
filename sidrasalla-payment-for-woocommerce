@@ -42,11 +42,7 @@ if (!class_exists('WC_Sidrasalla_Payment_Gateway')) {
 
                 $this->title        = $this->get_option('title');
                 $this->description  = $this->get_option('description');
-                $this->instructions = __('يرجى إرسال %s Sidra Coin عن طريق استخدام العنوان:', 'sidrasalla-pay-woo') . '<br><strong>%s</strong>.<br>' . __('بمجرد الانتهاء من ذلك، يرجى إدخال هاش المعاملة بالأسفل.', 'sidrasalla-pay-woo');                 
-                $this->init_form_fields();
-                $this->init_settings();
-
-                add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
+                             $this->instructions = __('يرجى إرسال %s Sidra Coin عن طريق استخدام زر نسخ العنوان بالأسفل', 'sidrasalla-pay-woo') . '<br><strong></strong><br>' . __('بمجرد الانتهاء من ذلك، يرجى إدخال هاش المعاملة الذي ستجده تحت كلمة Transaction confirmed! عند اتمام التحويل ثم اضغط تأكيد الطلب .', 'sidrasalla-pay-woo');                                  $this->init_form_fields();             $this->init_form_fields();                 add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
             }
 
             public function init_form_fields()
@@ -79,20 +75,61 @@ if (!class_exists('WC_Sidrasalla_Payment_Gateway')) {
                 );
             }
 
-            public function payment_fields()
+  public function payment_fields()
 {
     if ($this->description) {
         echo wpautop(wptexturize($this->description));
     }
 
+    // Display instructions
     echo '<p>' . sprintf($this->instructions, $this->get_order_total(), $this->get_option('address')) . '</p>';
-    ?>
-    <p><?php _e("ادخل هاش المعاملة:", 'sidrasalla-pay-woo'); ?></p>
-    <p class="form-row form-row-wide">
-        <input type="text" name="txid" placeholder="<?php _e('Transaction ID', 'sidrasalla-pay-woo'); ?>" />
-    </p>
-    <?php
+
+    // Display input field for transaction ID
+    echo '<p>' . __("ادخل هاش المعاملة:", 'sidrasalla-pay-woo') . '</p>';
+    echo '<p class="form-row form-row-wide">';
+    echo '<input type="text" name="txid" placeholder="' . __('Transaction ID', 'sidrasalla-pay-woo') . '" />';
+    echo '</p>';
+
+   // Get the wallet address
+$wallet_address = esc_attr($this->get_option('address'));
+
+// Display copy button for wallet address (without displaying the address field)
+echo '<div class="input-group">';
+echo '<input type="text" id="walletAddress" class="form-control" value="' . $wallet_address . '" readonly style="display: none;">';
+echo '<div class="input-group-append">';
+echo '<button class="btn btn-outline-secondary" type="button" onclick="copyAddress(\'' . $wallet_address . '\')" style="background-color: #987436; color: #wheat; border-color: #FFD700; border-radius: 10px; padding: 5px 7px;">نسخ عنوان محفظة الاستقبال</button>';
+echo '</div>';
+echo '</div>';
+
+// JavaScript function to copy the wallet address and display SweetAlert
+echo '<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>';
+echo '<script>
+        function copyAddress(walletAddress) {
+            var addressField = document.createElement("input");
+            addressField.setAttribute("type", "text");
+            addressField.setAttribute("value", walletAddress);
+            document.body.appendChild(addressField);
+            addressField.select();
+            document.execCommand("copy");
+            document.body.removeChild(addressField);
+            
+            // Display SweetAlert message
+            Swal.fire({
+                title: "نسخ عنوان المحفظة",
+                text: "تم نسخ عنوان محفظة الاستقبال بنجاح!",
+                icon: "success",
+                confirmButtonText: "موافق"
+            });
+        }
+      </script>';
+
+
 }
+
+
+
+
+
 
 
             public function validate_fields()
@@ -106,16 +143,26 @@ if (!class_exists('WC_Sidrasalla_Payment_Gateway')) {
 
                 // if transaction ID is already used in an existing order
                 if (get_posts(array('post_type' => 'shop_order', 'meta_key' => 'txid', 'meta_value' => $_POST['txid'], 'post_status' => 'any'))) {
-                    wc_add_notice(__('Transaction ID is not correct.', 'error'), 'error');
+                    wc_add_notice(__('هذا الهاش يتبع طلب سابق', 'error'), 'error');
                     return false;
                 }
                 return true;
             }
 
-           public function process_payment($order_id)
+          
+public function process_payment($order_id)
 {
     // Get the transaction ID from the POST data
     $txid = sanitize_text_field($_POST['txid']);
+    
+    // Get current network time
+    $current_network_time = time();
+
+    // Check if the transaction hash is already used in a previous order
+    if ($existing_order_id = $this->get_order_id_by_transaction_hash($txid)) {
+        wc_add_notice(__('Transaction hash already used in a previous order.', 'error'), 'error');
+        return false;
+    }
 
     // Let's connect to Sidra Chain API using cURL
     $curl = curl_init();
@@ -160,6 +207,10 @@ if (!class_exists('WC_Sidrasalla_Payment_Gateway')) {
     $order->payment_complete();
     $order->reduce_order_stock();
     $order->add_meta_data('txid', $txid, true);
+    
+    // Add network time to order meta
+    $order->add_meta_data('network_time', $current_network_time, true);
+    
     $order->save();
 
     // Empty cart
@@ -170,6 +221,19 @@ if (!class_exists('WC_Sidrasalla_Payment_Gateway')) {
         'result'   => 'success',
         'redirect' => $this->get_return_url($order)
     );
+}
+
+
+
+// Helper function to check if transaction hash is already used in a previous order
+private function get_order_id_by_transaction_hash($txid) {
+    global $wpdb;
+
+    $sql = "SELECT post_id FROM $wpdb->postmeta WHERE meta_key = 'txid' AND meta_value = %s";
+    $prepared_sql = $wpdb->prepare($sql, $txid);
+    $order_id = $wpdb->get_var($prepared_sql);
+
+    return $order_id;
 
 
 
