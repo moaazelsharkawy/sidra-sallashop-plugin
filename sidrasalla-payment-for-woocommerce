@@ -75,7 +75,7 @@ if (!class_exists('WC_Sidrasalla_Payment_Gateway')) {
                 );
             }
 
-  public function payment_fields()
+ public function payment_fields()
 {
     if ($this->description) {
         echo wpautop(wptexturize($this->description));
@@ -90,20 +90,26 @@ if (!class_exists('WC_Sidrasalla_Payment_Gateway')) {
     echo '<input type="text" name="txid" placeholder="' . __('Transaction ID', 'sidrasalla-pay-woo') . '" />';
     echo '</p>';
 
-   // Get the wallet address
-$wallet_address = esc_attr($this->get_option('address'));
+    // Display input field for wallet address
+    echo '<p>' . __("ادخل عنوان المحفظة التي ارسلت منها:", 'sidrasalla-pay-woo') . '</p>';
+    echo '<p class="form-row form-row-wide">';
+    echo '<input type="text" name="wallet_address" placeholder="' . __('عنوان المحفظة', 'sidrasalla-pay-woo') . '" />';
+    echo '</p>';
 
-// Display copy button for wallet address (without displaying the address field)
-echo '<div class="input-group">';
-echo '<input type="text" id="walletAddress" class="form-control" value="' . $wallet_address . '" readonly style="display: none;">';
-echo '<div class="input-group-append">';
-echo '<button class="btn btn-outline-secondary" type="button" onclick="copyAddress(\'' . $wallet_address . '\')" style="background-color: #987436; color: #wheat; border-color: #FFD700; border-radius: 10px; padding: 5px 7px;">نسخ عنوان محفظة الاستقبال</button>';
-echo '</div>';
-echo '</div>';
+    // Get the wallet address
+    $wallet_address = esc_attr($this->get_option('address'));
 
-// JavaScript function to copy the wallet address and display SweetAlert
-echo '<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>';
-echo '<script>
+    // Display copy button for wallet address (without displaying the address field)
+    echo '<div class="input-group">';
+    echo '<input type="text" id="walletAddress" class="form-control" value="' . $wallet_address . '" readonly style="display: none;">';
+    echo '<div class="input-group-append">';
+    echo '<button class="btn btn-outline-secondary" type="button" onclick="copyAddress(\'' . $wallet_address . '\')" style="background-color: #987436; color: #wheat; border-color: #FFD700; border-radius: 10px; padding: 5px 7px;">نسخ عنوان محفظة الاستقبال</button>';
+    echo '</div>';
+    echo '</div>';
+
+    // JavaScript function to copy the wallet address and display SweetAlert
+    echo '<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>';
+    echo '<script>
         function copyAddress(walletAddress) {
             var addressField = document.createElement("input");
             addressField.setAttribute("type", "text");
@@ -122,13 +128,7 @@ echo '<script>
             });
         }
       </script>';
-
-
 }
-
-
-
-
 
 
 
@@ -152,11 +152,17 @@ echo '<script>
           
 public function process_payment($order_id)
 {
+    
+     // الحصول على العنوان المحفظة من بيانات POST
+    $wallet_address = sanitize_text_field($_POST['wallet_address']);
+    
     // Get the transaction ID from the POST data
     $txid = sanitize_text_field($_POST['txid']);
     
     // Get current network time
     $current_network_time = time();
+    
+    
 
     // Check if the transaction hash is already used in a previous order
     if ($existing_order_id = $this->get_order_id_by_transaction_hash($txid)) {
@@ -211,6 +217,8 @@ public function process_payment($order_id)
     // Add network time to order meta
     $order->add_meta_data('network_time', $current_network_time, true);
     
+    // حفظ عنوان المحفظة في بيانات الطلب
+    $order->update_meta_data('wallet_address', $wallet_address);
     $order->save();
 
     // Empty cart
