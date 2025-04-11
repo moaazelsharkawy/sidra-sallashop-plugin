@@ -1,0 +1,158 @@
+/* ========== تنسيق البطاقة (Card) ========== */
+.sidrasalla-card {
+    width: 100%;
+    max-width: 400px;
+    margin: 10px auto;
+    /* خلفية صفراء متدرجة هادئة */
+    background: linear-gradient(135deg, #fff9e6, #fff2b8);
+    border-radius: 10px;
+    /* شادو بنمط فلات مع تأثير خفيف */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    font-family: 'cairo', sans-serif;
+border-right: 6px solid #d9911e;
+}
+
+
+/* رأس البطاقة */
+.sidrasalla-card-header {
+    background: #fffde7;
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    text-align: center;
+}
+
+.sidrasalla-card-title {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #333;
+    font-weight: 600;
+}
+
+/* محتوى البطاقة */
+.sidrasalla-card-body {
+    padding: 20px;
+}
+
+/* الوصف/التعليمات */
+.sidrasalla-description {
+margin-top: -15px;
+    text-align: center;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #666;
+}
+
+/* ========== خطوات الدفع ========== */
+.sidrasalla-payment-steps {
+    display: grid;
+    grid-template-columns: 1fr;
+    row-gap: 20px; /* زيادة التباعد بين الصفوف */
+}
+
+/* كل صف من الصفوف */
+.sidrasalla-payment-row {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* تباعد داخلي بين العناصر بالصف */
+}
+
+/* التسمية (Label) */
+.sidrasalla-payment-label {
+    font-weight: bold;
+    font-size: 0.95rem;
+    color: #444;
+    min-width: 120px;
+}
+
+/* تنسيق محتوى الصف (زر النسخ + النص) */
+.sidrasalla-payment-value,
+.truncated-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+/* النص أو القيمة */
+.sidrasalla-order-value {
+    
+    padding: 8px 10px;
+    
+    font-weight: bold;
+    font-size: 13px;
+    color: #d9911e;
+    flex: 1;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+}
+
+/* حقل الإدخال لهش المعاملة */
+.sidrasalla-txid input[type="text"] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d9911e;
+    border-radius: 6px;
+    font-size: 0.95rem;
+}
+
+/* ========== زر النسخ ========== */
+.sidrasalla-copy-btn {
+    background: #ffffff;  /* لون أصفر هادئ */
+    border: none;
+    color: #fbc02d !important;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.3s ease;
+    white-space: nowrap;
+}
+
+.sidrasalla-copy-btn:hover {
+    background: #f9a825;
+}
+
+.sidrasalla-copy-btn i {
+    font-size: 1rem;
+}
+
+/* ========== تحسينات للجوال ========== */
+@media (max-width: 480px) {
+    .sidrasalla-card {
+        max-width: 95%;
+        margin: 10px auto;
+    }
+
+    .sidrasalla-card-body {
+        padding: 15px;
+    }
+
+    .sidrasalla-payment-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .sidrasalla-payment-value,
+    .truncated-row {
+        flex-direction: row;
+        width: 100%;
+    }
+
+    .sidrasalla-order-value {
+        font-size: 14px;
+    }
+}
+
+
+.tooltip-container2 {
+    
+    transform: translate(-10px, -20px); /* يحرك العنصر 20px لأعلى و20px لليسار */
+    z-index: 1000; /* اختياري: لتكون فوق العناصر الأخرى */
+gap: 15px; 
+}
+
