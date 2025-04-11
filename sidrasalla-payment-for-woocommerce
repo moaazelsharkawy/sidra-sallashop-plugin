@@ -1,252 +1,513 @@
 <?php
-
 /**
  * Plugin Name: Sidracoin Payment for WooCommerce
  * Plugin URI: https://salla-shop.com/sidra
  * Author: Moaaz Elsharkawy
  * Author URI: https://salla-shop.com/sidra
  * Description: This plugin allows for payments with Sidra Coin.
- * Version: 0.1.0
+ * Version: 0.1.1
  * License: GPL-2.0-or-later
  * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  */
 
-if (!defined('ABSPATH')) {
-    exit; // Exit if accessed directly
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
 }
 
-add_filter('woocommerce_payment_gateways', 'add_to_woo_sidrasalla_payment_gateway');
-
-function add_to_woo_sidrasalla_payment_gateway($gateways)
-{
+/* إضافة البوابة إلى قائمة بوابات الدفع في WooCommerce */
+add_filter( 'woocommerce_payment_gateways', 'add_to_woo_sidrasalla_payment_gateway' );
+function add_to_woo_sidrasalla_payment_gateway( $gateways ) {
     $gateways[] = 'WC_Sidrasalla_Payment_Gateway';
     return $gateways;
 }
 
-if (!class_exists('WC_Sidrasalla_Payment_Gateway')) {
+/* التأكد من تحميل بوابة الدفع بعد تحميل جميع الإضافات */
+if ( ! class_exists( 'WC_Sidrasalla_Payment_Gateway' ) ) {
+    add_action( 'plugins_loaded', 'sidrasalla_payment_init', 11 );
+    function sidrasalla_payment_init() {
 
-    add_action('plugins_loaded', 'sidrasalla_payment_init', 11);
+        class WC_Sidrasalla_Payment_Gateway extends WC_Payment_Gateway {
 
-    function sidrasalla_payment_init()
-    {
-        class WC_Sidrasalla_Payment_Gateway extends WC_Payment_Gateway
-        {
-
-            public function __construct()
-            {
+            public function __construct() {
                 $this->id                 = 'sidrasalla_payment';
-                $this->icon = apply_filters( 'woocommerce_sidrasalla_icon', 'https://sidra.salla-shop.com/wp-content/uploads/2024/04/paylog3.png' );
-                $this->has_fields         = false;
-                $this->method_title       = __('Sidrasalla Payment', 'sidrasalla-pay-woo');
-                $this->method_description = __('Salla Sidra payment systems.', 'sidrasalla-pay-woo');
+                $this->icon               = apply_filters( 'woocommerce_sidrasalla_icon', 'https://salla-shop.com/wp-content/uploads/2025/04/تصميم-بدون-عنوان-1.png' );
+                $this->has_fields         = true;
+                $this->method_title       = __( 'Sidrasalla Payment', 'sidrasalla-pay-woo' );
+                $this->method_description = __( 'Salla Sidra payment systems.', 'sidrasalla-pay-woo' );
+                $this->title              = $this->get_option( 'title' );
+                $this->description        = $this->get_option( 'description' );
+                
+                /* تحميل الإعدادات */
+                $this->init_form_fields();
+                $this->init_settings();
 
-                $this->title        = $this->get_option('title');
-                $this->description  = $this->get_option('description');
-                             $this->instructions = __('يرجى إرسال %s Sidra Coin عن طريق استخدام زر نسخ العنوان بالأسفل', 'sidrasalla-pay-woo') . '<br><strong></strong><br>' . __('بمجرد الانتهاء من ذلك، يرجى إدخال هاش المعاملة الذي ستجده تحت كلمة Transaction confirmed! عند اتمام التحويل ثم اضغط تأكيد الطلب .', 'sidrasalla-pay-woo');                                  $this->init_form_fields();             $this->init_form_fields();                 add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
+                /* حفظ الإعدادات عند التحديث */
+                add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
             }
 
-            public function init_form_fields()
-            {
+            public function init_form_fields() {
                 $this->form_fields = array(
-                    'enabled'     => array(
-                        'title'       => __('Enable/Disable', 'sidrasalla-pay-woo'),
-                        'label'       => __('Enable Crypto Sallasidra Gateway', 'sidrasalla-pay-woo'),
-                        'type'        => 'checkbox',
-                        'description' => '',
-                        'default'     => 'no',
+                    'enabled'       => array(
+                        'title'   => __( 'Enable/Disable', 'sidrasalla-pay-woo' ),
+                        'label'   => __( 'Enable Crypto Sallasidra Gateway', 'sidrasalla-pay-woo' ),
+                        'type'    => 'checkbox',
+                        'default' => 'no',
                     ),
-                    'title'       => array(
-                        'title'       => __('Title', 'sidrasalla-pay-woo'),
+                    'title'         => array(
+                        'title'       => __( 'Title', 'sidrasalla-pay-woo' ),
                         'type'        => 'text',
-                        'description' => __('This controls the title which the user sees during checkout.', 'sidrasalla-pay-woo'),
+                        'description' => __( 'This controls the title which the user sees during checkout.', 'sidrasalla-pay-woo' ),
                         'default'     => 'Crypto',
                         'desc_tip'    => true,
                     ),
-                    'description' => array(
-                        'title'       => __('Description', 'sidrasalla-pay-woo'),
+                    'description'   => array(
+                        'title'       => __( 'Description', 'sidrasalla-pay-woo' ),
                         'type'        => 'textarea',
-                        'description' => __('This controls the description which the user sees during checkout.', 'sidrasalla-pay-woo'),
+                        'description' => __( 'This controls the description which the user sees during checkout.', 'sidrasalla-pay-woo' ),
                         'default'     => 'Pay with cryptocurrency via our super-cool payment gateway.',
                     ),
-                    'address'     => array(
-                        'title' => __('Wallet address', 'sidrasalla-pay-woo'),
-                        'type'  => 'text',
+                    'address'       => array(
+                        'title'       => __( 'Wallet address', 'sidrasalla-pay-woo' ),
+                        'type'        => 'text',
+                        'description' => __( 'Enter your wallet address.', 'sidrasalla-pay-woo' ),
+                    ),
+                    'sidra_current' => array(
+                        'title'       => __( 'سعر سيدرا الحالي بالجنيه', 'sidrasalla-pay-woo' ),
+                        'type'        => 'text',
+                        'description' => __( 'أدخل سعر سيدرا الحالي بالجنيه.', 'sidrasalla-pay-woo' ),
+                        'default'     => '1',
+                        'desc_tip'    => true,
+                    ),
+                    'dollar_rate'   => array(
+                        'title'       => __( 'سعر الدولار بالجنيه', 'sidrasalla-pay-woo' ),
+                        'type'        => 'text',
+                        'description' => __( 'أدخل سعر الدولار بالجنيه.', 'sidrasalla-pay-woo' ),
+                        'default'     => '30',
+                        'desc_tip'    => true,
                     ),
                 );
             }
 
- public function payment_fields()
-{
-    if ($this->description) {
-        echo wpautop(wptexturize($this->description));
-    }
+            /**
+             * حساب قيمة سيدرا المطلوبة:
+             * - جلب سعر Pi بالدولار باستخدام دالة get_pi_price_usd
+             * - ضرب إجمالي المنتجات في سعر Pi بالدولار
+             * - ضرب الناتج في سعر الدولار بالجنيه
+             * - ثم قسمته على سعر سيدرا بالجنيه
+             */
+            public function calculate_sidra_amount() {
+                // جلب سعر Pi بالدولار
+                $pi_price_usd = $this->get_pi_price_usd('price');
+                if ( ! $pi_price_usd ) {
+                    return 0;
+                }
 
-    // Display instructions
-    echo '<p>' . sprintf($this->instructions, $this->get_order_total(), $this->get_option('address')) . '</p>';
+                $sidra_current = floatval( $this->get_option( 'sidra_current' ) );
+                $dollar_rate   = floatval( $this->get_option( 'dollar_rate' ) );
+                $cart_total    = 0;
 
-    // Display input field for transaction ID
-    echo '<p>' . __("ادخل هاش المعاملة:", 'sidrasalla-pay-woo') . '</p>';
-    echo '<p class="form-row form-row-wide">';
-    echo '<input type="text" name="txid" placeholder="' . __('Transaction ID', 'sidrasalla-pay-woo') . '" />';
-    echo '</p>';
+                // حساب إجمالي المنتجات في السلة
+                if ( WC()->cart ) {
+                    foreach ( WC()->cart->get_cart() as $item ) {
+                        $cart_total += floatval( $item['line_total'] );
+                    }
+                }
 
-    // Display input field for wallet address
-    echo '<p>' . __("ادخل عنوان المحفظة التي ارسلت منها:", 'sidrasalla-pay-woo') . '</p>';
-    echo '<p class="form-row form-row-wide">';
-    echo '<input type="text" name="wallet_address" placeholder="' . __('عنوان المحفظة', 'sidrasalla-pay-woo') . '" />';
-    echo '</p>';
+                // حساب القيمة المطلوبة
+                $required_value = ( $cart_total * $pi_price_usd * $dollar_rate ) / $sidra_current;
+                return $required_value;
+            }
 
-    // Get the wallet address
-    $wallet_address = esc_attr($this->get_option('address'));
+            /**
+             * جلب سعر Pi بالدولار من مصادر مختلفة مع تخزين القيمة مؤقتاً
+             */
+            public function get_pi_price_usd( $return_type = 'array' ) {
+                $cached_price  = get_transient( 'pi_network_price_usd' );
+                $cached_source = get_transient( 'pi_network_price_source' );
 
-    // Display copy button for wallet address (without displaying the address field)
-    echo '<div class="input-group">';
-    echo '<input type="text" id="walletAddress" class="form-control" value="' . $wallet_address . '" readonly style="display: none;">';
-    echo '<div class="input-group-append">';
-    echo '<button class="btn btn-outline-secondary" type="button" onclick="copyAddress(\'' . $wallet_address . '\')" style="background-color: #987436; color: #wheat; border-color: #FFD700; border-radius: 10px; padding: 5px 7px;">نسخ عنوان محفظة الاستقبال</button>';
-    echo '</div>';
-    echo '</div>';
+                if ( $cached_price !== false && $cached_source !== false ) {
+                    if ( $return_type === 'price' ) {
+                        return $cached_price;
+                    }
+                    return array( 'price' => $cached_price, 'source' => $cached_source );
+                }
 
-    // JavaScript function to copy the wallet address and display SweetAlert
-    echo '<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>';
-    echo '<script>
-        function copyAddress(walletAddress) {
-            var addressField = document.createElement("input");
-            addressField.setAttribute("type", "text");
-            addressField.setAttribute("value", walletAddress);
-            document.body.appendChild(addressField);
-            addressField.select();
-            document.execCommand("copy");
-            document.body.removeChild(addressField);
-            
-            // Display SweetAlert message
+                $sources = array(
+                    'OKX'          => 'https://www.okx.com/api/v5/market/index-tickers?instId=PI-USDT',
+                    'CoinGecko'    => 'https://api.coingecko.com/api/v3/simple/price?ids=pi-network&vs_currencies=usd',
+                    'CoinMarketCap'=> 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=PI&convert=USD'
+                );
+
+                foreach ( $sources as $source => $url ) {
+                    $response = wp_remote_get( $url );
+                    if ( ! is_wp_error( $response ) ) {
+                        $body = wp_remote_retrieve_body( $response );
+                        $data = json_decode( $body, true );
+
+                        if ( $source === 'OKX' && isset( $data['data'][0]['idxPx'] ) ) {
+                            $price = $data['data'][0]['idxPx'];
+                        } elseif ( $source === 'CoinGecko' && isset( $data['pi-network']['usd'] ) ) {
+                            $price = $data['pi-network']['usd'];
+                        } elseif ( $source === 'CoinMarketCap' && isset( $data['data']['PI']['quote']['USD']['price'] ) ) {
+                            $price = $data['data']['PI']['quote']['USD']['price'];
+                        }
+
+                        if ( ! empty( $price ) ) {
+                            set_transient( 'pi_network_price_usd', $price, 30 );
+                            set_transient( 'pi_network_price_source', $source, 30 );
+                            if ( $return_type === 'price' ) {
+                                return $price;
+                            }
+                            return array( 'price' => $price, 'source' => $source );
+                        }
+                    }
+                }
+
+                if ( $return_type === 'price' ) {
+                    return false;
+                }
+                return array( 'price' => false, 'source' => 'غير معروف' );
+            }
+
+            /**
+             * عرض حقول الدفع مع دعم تحديث قيمة سيدرا باستخدام Ajax
+             */
+            public function payment_fields() {
+    ?>
+    <div class="sidrasalla-card">
+
+        <!-- محتوى البطاقة -->
+        <div class="sidrasalla-card-body">
+            <?php if ( $this->description ) : ?>
+                <p class="sidrasalla-description">
+                    <?php echo wp_kses_post( wpautop( wptexturize( $this->description ) ) ); ?>
+                </p>
+            <?php endif; ?>
+
+            <!-- خطوات الدفع -->
+            <div class="sidrasalla-payment-steps">
+
+                <!-- صف قيمة الإجمالي -->
+                <div class="sidrasalla-payment-row">
+                    <label class="sidrasalla-payment-label">
+                        <?php esc_html_e( 'الاجمالي :', 'sidrasalla-pay-woo' ); ?>
+                    </label>
+                    <div class="sidrasalla-payment-value">
+                        <button class="sidrasalla-copy-btn" type="button" onclick="copySidraAmount()">
+                            <i class="fa fa-copy"></i>
+                        </button>
+                        <span class="sidrasalla-order-value">
+                            <?php echo number_format( $this->calculate_sidra_amount(), 3 ); ?>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- صف عنوان المحفظة التمهيدي -->
+                <div class="sidrasalla-payment-row">
+                    <label class="sidrasalla-payment-label">
+                        <?php esc_html_e( 'عنوان المول:', 'sidrasalla-pay-woo' ); ?>
+                    </label>
+                </div>
+
+                <!-- صف عرض عنوان المحفظة المختصر مع زر النسخ -->
+                <div class="sidrasalla-payment-row truncated-row">
+                    <button class="sidrasalla-copy-btn" type="button"
+                        onclick="copyAddress('<?php echo esc_js( $this->get_option( 'address' ) ); ?>')">
+                        <i class="fa fa-copy"></i>
+                    </button>
+                    <span class="sidrasalla-order-value">
+                        <?php
+                        $full_address = $this->get_option( 'address' );
+                        if ( strlen( $full_address ) > 8 ) {
+                            echo esc_html( substr( $full_address, 0, 4 ) . '...' . substr( $full_address, -4 ) );
+                        } else {
+                            echo esc_html( $full_address );
+                        }
+                        ?>
+                    </span>
+                </div>
+
+                <!-- صف حقل إدخال هاش المعاملة -->
+                <div class="sidrasalla-payment-row sidrasalla-txid">
+                    <label class="sidrasalla-payment-label" for="sidrasalla_transaction_hash">
+                        <?php esc_html_e( 'ادخل هاش المعاملة:', 'sidrasalla-pay-woo' ); ?>
+                    </label>
+                    <input type="text" id="sidrasalla_transaction_hash" name="txid"
+                           placeholder="<?php esc_attr_e( 'Transaction Hash', 'sidrasalla-pay-woo' ); ?>" />
+                </div>
+
+            </div><!-- .sidrasalla-payment-steps -->
+        </div><!-- .sidrasalla-card-body -->
+
+        <!-- تعديل عرض علامة الاستفهام وأيقونة GitHub -->
+        <div class="tooltip-container2">
+            <i class="fas fa-question-circle tooltip-icon"></i>
+            <a href="https://github.com/moaazelsharkawy/Woocommerce-Pi-Network-Gateway" target="_blank" class="github-link">
+                <i class="fab fa-github github-icon"></i>
+            </a>
+        </div>
+
+    </div><!-- .sidrasalla-card -->
+
+
+<!-- تضمين مكتبة SweetAlert2 مع جافاسكريبت للنسخ وتحديث قيمة سيدرا -->
+<!-- تضمين مكتبة Font Awesome (إذا لم تكن محملة مسبقًا) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-..." crossorigin="anonymous" />
+
+<!-- تضمين مكتبة SweetAlert2 -->
+<!-- تضمين مكتبة Font Awesome إذا لم تكن محملة مسبقًا -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" crossorigin="anonymous" />
+
+<!-- تضمين مكتبة SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+jQuery(document).ready(function($) {
+
+    /* ============================
+       دوال النسخ (Copy Functions)
+    ============================ */
+    // تأكد من تعريف الدوال على مستوى الـ window ليكونا متاحين عالميًا
+    window.copyAddress = function(address) {
+        navigator.clipboard.writeText(address).then(function() {
             Swal.fire({
-                title: "نسخ عنوان المحفظة",
-                text: "تم نسخ عنوان محفظة الاستقبال بنجاح!",
+                toast: true,
+                position: "center",
                 icon: "success",
-                confirmButtonText: "موافق"
+                title: "تم النسخ",
+                showConfirmButton: false,
+                timer: 2000
             });
+        }).catch(function(err) {
+            console.error('خطأ في النسخ: ', err);
+        });
+    };
+
+    window.copySidraAmount = function() {
+        var amt = $('.sidrasalla-order-value').first().text();
+        navigator.clipboard.writeText(amt).then(function() {
+            Swal.fire({
+                toast: true,
+                position: "center",
+                icon: "success",
+                title: "تم النسخ",
+                showConfirmButton: false,
+                timer: 2000
+            });
+        }).catch(function(err) {
+            console.error('خطأ في النسخ: ', err);
+        });
+    };
+
+    /* ============================
+       تحديث قيمة سيدرا عبر AJAX
+    ============================ */
+    function updateSidraAmount() {
+        $.ajax({
+            url: wc_checkout_params.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'update_sidra_amount'
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('.sidrasalla-order-value').first().text(response.data.sidra_amount);
+                }
+            }
+        });
+    }
+
+    // استخدام تقنية "debounce" لتفادي الاستدعاء المتكرر عند تحديث صفحة الدفع
+    var debounceTimer;
+    $(document).on('updated_checkout', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function() {
+            updateSidraAmount();
+        }, 500); // تأخير 500 مللي ثانية
+    });
+
+    /* ============================
+       نافذة معالجة الدفع (Payment Processing Window)
+    ============================ */
+    // هنا نستخدم حدث النقر على زر "Place Order" للتأكد من ظهور النافذة قبل بدء عملية الدفع
+    let isSwalOpen = false;
+    $('#place_order').on('click', function(e) {
+        // تأكد من أن طريقة الدفع المختارة هي بوابة سيدرا (تأكد من أن الـ ID مكتوب بشكل صحيح)
+        if ($('#payment_method_<?php echo $this->id; ?>').is(':checked')) {
+            // إذا كانت النافذة مفتوحة مسبقًا فلا نقوم بعمل شيء
+            if (isSwalOpen) {
+                return false;
+            }
+            // إيقاف تنفيذ الإجراء الافتراضي للنقر
+            e.preventDefault();
+            isSwalOpen = true;
+
+            // عرض نافذة SweetAlert2 لمعالجة الدفع
+            Swal.fire({
+                title: 'التحقق من الدفع',
+                html: 'يرجى الانتظار، جاري التحقق من الدفع عبر بلوك تشين سيدرا... <i class="fa-solid fa-triangle-exclamation" style="color: #a94442; font-size: 20px;"></i> لا تغلق النافذة إلا عند ظهور خطأ.',
+                icon: 'warning',
+                showConfirmButton: false,
+                showCloseButton: true,
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            // ننتظر مدة قصيرة ثم نعيد إرسال النموذج بحيث يتم التعامل مع الدفع بالطريقة الافتراضية لـ WooCommerce
+            // تأكد من أن WooCommerce يتولى معالجة الـ AJAX وأنك لا تقوم بتكرار العملية هنا
+            setTimeout(function(){
+                $('form.checkout').submit();
+            }, 500);
+
+            return false;
         }
-      </script>';
-}
+    });
+    
+    
+$('.github-link').on('click', function(e) {
+    e.preventDefault();
+    Swal.fire({
+        title: 'تأكيد الانتقال',
+        text: 'هل تريد الانتقال للكود المصدري للبوابة على GitHub؟',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'تابع',
+        cancelButtonText: 'إغلاق'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = $(this).attr('href');
+        }
+    });
+});
+
+$('.tooltip-icon').on('click', function() {
+    Swal.fire({
+        title: 'معلومات عن البوابة',
+        text: 'هذه البوابة آمنة وسهلة، مطورة من Salla Developer، الإصدار V1.00، ومتصلة بـ Sidra Blockchain API.',
+        icon: 'info',
+        showCloseButton: true,
+        showCancelButton: true,
+        confirmButtonText: 'ريلز الدفع',
+        cancelButtonText: 'الدعم'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                title: 'كيف يتم الدفع',
+                html: '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;">' +
+                      '<iframe src="https://www.youtube.com/embed/QGpIz4AMLUA" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allowfullscreen></iframe>' +
+                      '</div>',
+                width: 800,
+                showCloseButton: true,
+                showConfirmButton: false
+            });
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            window.open('https://wa.me/201557137448', '_blank');
+        }
+    });
+});
+
+    
+});
+</script>
 
 
-
-            public function validate_fields()
-            {
-
-                // if transaction ID is not provided
-                if (empty($_POST['txid'])) {
-                    wc_add_notice(__('Transaction Hash مطلوب!', 'error'), 'error');
-                    return false;
-                }
-
-                // if transaction ID is already used in an existing order
-                if (get_posts(array('post_type' => 'shop_order', 'meta_key' => 'txid', 'meta_value' => $_POST['txid'], 'post_status' => 'any'))) {
-                    wc_add_notice(__('هذا الهاش يتبع طلب سابق', 'error'), 'error');
-                    return false;
-                }
-                return true;
+                <?php
             }
 
-          
-public function process_payment($order_id)
-{
-    
-     // الحصول على العنوان المحفظة من بيانات POST
-    $wallet_address = sanitize_text_field($_POST['wallet_address']);
-    
-    // Get the transaction ID from the POST data
-    $txid = sanitize_text_field($_POST['txid']);
-    
-    // Get current network time
-    $current_network_time = time();
-    
-    
+            public function process_payment( $order_id ) {
+                $order = wc_get_order( $order_id );
+                $txid  = sanitize_text_field( $_POST['txid'] );
+                $received_wallet_address = sanitize_text_field( $this->get_option( 'address' ) );
+                $remote = wp_remote_get( 'https://ledger.sidrachain.com/api/v2/transactions/' . $txid );
 
-    // Check if the transaction hash is already used in a previous order
-    if ($existing_order_id = $this->get_order_id_by_transaction_hash($txid)) {
-        wc_add_notice(__('Transaction hash already used in a previous order.', 'error'), 'error');
-        return false;
-    }
+                if ( is_wp_error( $remote ) ) {
+                    wc_add_notice( __( 'خطأ في الاتصال بـ API: ' . $remote->get_error_message(), 'sidrasalla-pay-woo' ), 'error' );
+                    return;
+                }
 
-    // Let's connect to Sidra Chain API using cURL
-    $curl = curl_init();
+                $response_code = wp_remote_retrieve_response_code( $remote );
+                if ( $response_code !== 200 ) {
+                    wc_add_notice( __( 'فشل الاتصال ببلوكتيشن سيدرا. رمز الاستجابة: ' . $response_code, 'sidrasalla-pay-woo' ), 'error' );
+                    return;
+                }
 
-    // Configure cURL options
-    $api_url = 'https://ledger.sidrachain.com/api/v2/transactions';
-    $request_url = "{$api_url}?hash={$txid}";
+                $response_body = json_decode( wp_remote_retrieve_body( $remote ), true );
+                if ( json_last_error() !== JSON_ERROR_NONE ) {
+                    wc_add_notice( __( 'خطأ في تحليل استجابة API.', 'sidrasalla-pay-woo' ), 'error' );
+                    return;
+                }
 
-    curl_setopt($curl, CURLOPT_URL, $request_url);
-    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($curl, CURLOPT_TIMEOUT, 30); // Set timeout to 30 seconds
+                if ( $response_body['status'] !== 'ok' ) {
+                    wc_add_notice( __( 'المعاملة فشلت. تأكد من ادخال الهاش او انه صحيح: ' . $response_body['status'], 'sidrasalla-pay-woo' ), 'error' );
+                    return;
+                }
 
-    // Execute the cURL request
-    $response = curl_exec($curl);
+                if ( $received_wallet_address !== $response_body['to']['hash'] ) {
+                    wc_add_notice( __( 'خطأ في عنوان المحفظة المستقبلة.', 'sidrasalla-pay-woo' ), 'error' );
+                    return;
+                }
 
-    // Check for cURL errors
-    if (curl_errno($curl)) {
-        wc_add_notice(__('Failed to connect to Sidra Chain.', 'error'), 'error');
-        return false;
-    }
+                if ( $response_body['confirmations'] < 1 ) {
+                    wc_add_notice( __( 'المعاملة تحتاج إلى تأكيدات أكثر.', 'sidrasalla-pay-woo' ), 'error' );
+                    return;
+                }
 
-    // Decode response body
-    $response_data = json_decode($response);
+                $transaction_time_stamp = strtotime( $response_body['timestamp'] );
+                if ( time() - $transaction_time_stamp > 600 ) {
+                    wc_add_notice( __( 'فترة تقديم الهاش تجاوزت 10 دقائق.', 'sidrasalla-pay-woo' ), 'error' );
+                    return;
+                }
 
-    // Check response status code
-    $response_code = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-    if ($response_code !== 200 || empty($response_data->items)) {
-        wc_add_notice(__('Invalid transaction hash.', 'error'), 'error');
-        return false;
-    }
+                // استخدام BC Math لضبط الدقة والتأكد من أن القيمة المدفوعة تغطي المبلغ المطلوب
+                bcscale(18);
+                $converted_value_bc = bcdiv($response_body['value'], '1000000000000000000');
+                $calculated_value = $this->calculate_sidra_amount();
+                $calculated_value_bc = (string)$calculated_value;
 
-    // Transaction hash is valid, process the payment
-    // You can add your payment processing logic here
+                // مقارنة بدقة 3 منازل عشرية باستخدام bccomp
+                if ( bccomp($converted_value_bc, $calculated_value_bc, 3) < 0 ) {
+                    wc_add_notice( __( 'القيمة المدفوعة أقل من القيمة المطلوبة.', 'sidrasalla-pay-woo' ), 'error' );
+                    return;
+                }
 
-    // Close cURL session
-    curl_close($curl);
+                $order->payment_complete();
+                $order->add_order_note( sprintf( 'تم الدفع باستخدام عملة Sidra. معاملة هاش: %s', $txid ) );
+                wc_add_notice( __( 'تم الدفع بنجاح.', 'sidrasalla-pay-woo' ), 'success' );
 
-    // Get the order
-    $order = wc_get_order($order_id);
-
-    // Mark the order as complete
-    $order->payment_complete();
-    $order->reduce_order_stock();
-    $order->add_meta_data('txid', $txid, true);
-    
-    // Add network time to order meta
-    $order->add_meta_data('network_time', $current_network_time, true);
-    
-    // حفظ عنوان المحفظة في بيانات الطلب
-    $order->update_meta_data('wallet_address', $wallet_address);
-    $order->save();
-
-    // Empty cart
-    WC()->cart->empty_cart();
-
-    // Redirect to the thank you page
-    return array(
-        'result'   => 'success',
-        'redirect' => $this->get_return_url($order)
-    );
-}
-
-
-
-// Helper function to check if transaction hash is already used in a previous order
-private function get_order_id_by_transaction_hash($txid) {
-    global $wpdb;
-
-    $sql = "SELECT post_id FROM $wpdb->postmeta WHERE meta_key = 'txid' AND meta_value = %s";
-    $prepared_sql = $wpdb->prepare($sql, $txid);
-    $order_id = $wpdb->get_var($prepared_sql);
-
-    return $order_id;
-
-
-
-
+                return array(
+                    'result'   => 'success',
+                    'redirect' => $this->get_return_url( $order ),
+                );
             }
         }
     }
 }
+
+/* إضافة نقطة نهاية (endpoint) لـ Ajax لتحديث قيمة سيدرا عند تحديث الـ checkout */
+add_action( 'wp_ajax_update_sidra_amount', 'update_sidra_amount_callback' );
+add_action( 'wp_ajax_nopriv_update_sidra_amount', 'update_sidra_amount_callback' );
+function update_sidra_amount_callback() {
+    // إنشاء كائن من البوابة لحساب قيمة سيدرا جديدة
+    $gateway = new WC_Sidrasalla_Payment_Gateway();
+    $sidra_amount = $gateway->calculate_sidra_amount();
+    if ( $sidra_amount && is_numeric( $sidra_amount ) ) {
+        wp_send_json_success( array( 'sidra_amount' => number_format( $sidra_amount, 3 ) ) );
+    } else {
+        wp_send_json_error( array( 'message' => 'حدث خطأ أثناء حساب قيمة سيدرا.' ) );
+    }
+}
+
+add_action( 'wp_enqueue_scripts', 'enqueue_sidrasalla_styles' );
+function enqueue_sidrasalla_styles() {
+    if ( is_checkout() ) {
+        $version = filemtime( plugin_dir_path( __FILE__ ) . 'css/sidrasalla-styles.css' );
+        wp_enqueue_style(
+            'sidrasalla-styles',
+            plugin_dir_url( __FILE__ ) . 'css/sidrasalla-styles.css',
+            array(),
+            $version
+        );
+    }
+}
+?>
